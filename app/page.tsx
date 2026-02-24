@@ -9,18 +9,17 @@ interface Message {
 }
 
 const SUGGESTIONS = [
-  'Explain the bias-variance tradeoff with a business example',
-  'How do I prepare for consulting case interviews?',
-  'What is the difference between supervised and unsupervised learning?',
-  'Help me understand discounted cash flow analysis',
+  'Review my Python code',
+  'Roast my portfolio site',
+  'Is my code spaghetti?',
+  'Am I using Git wrong?',
 ]
 
-function GraduationCapIcon({ size = 24 }: { size?: number }) {
+function ChefIcon({ size = 24 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
-      <path d="M6 12v5c0 1.66 2.69 3 6 3s6-1.34 6-3v-5" />
-    </svg>
+    <span style={{ fontSize: size * 0.85, lineHeight: 1 }} role="img" aria-label="chef">
+      👨‍🍳
+    </span>
   )
 }
 
@@ -46,7 +45,7 @@ function BotIcon() {
       flexShrink: 0,
       color: '#2563eb',
     }}>
-      <GraduationCapIcon size={16} />
+      <ChefIcon size={16} />
     </div>
   )
 }
@@ -170,14 +169,14 @@ export default function Home() {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ color: '#2563eb' }}>
-            <GraduationCapIcon size={22} />
+            <ChefIcon size={22} />
           </div>
           <div>
             <h1 style={{ fontSize: 17, fontWeight: 700, color: '#111', lineHeight: 1.2 }}>
-              LBS Buddy
+              Chef Code Ramsay
             </h1>
             <p style={{ fontSize: 12.5, color: '#999', marginTop: 1 }}>
-              MAM Teaching Assistant
+              Brutally Honest Code Reviews
             </p>
           </div>
         </div>
@@ -218,13 +217,13 @@ export default function Home() {
           }}>
             <div style={{ textAlign: 'center' }}>
               <div style={{ color: '#2563eb', marginBottom: 12 }}>
-                <GraduationCapIcon size={40} />
+                <ChefIcon size={40} />
               </div>
               <h2 style={{ fontSize: 22, fontWeight: 700, color: '#111', marginBottom: 8 }}>
-                Hey! I&apos;m LBS Buddy
+                Hey! I&apos;m Chef Code Ramsay
               </h2>
               <p style={{ color: '#888', fontSize: 15, maxWidth: 420, lineHeight: 1.5 }}>
-                Your MAM teaching assistant. Ask me about course concepts, career advice, or anything analytics-related.
+                Paste your code. I dare you.
               </p>
             </div>
             <div style={{
@@ -336,7 +335,7 @@ export default function Home() {
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask me anything..."
+            placeholder="Paste your code or ask me anything..."
             rows={1}
             style={{
               flex: 1,
@@ -378,7 +377,7 @@ export default function Home() {
           color: '#bbb',
           marginTop: 10,
         }}>
-          Powered by Claude · LBS GenAI Assignment
+          Powered by Claude · Where&apos;s the Error Handling?!
         </p>
       </div>
     </div>

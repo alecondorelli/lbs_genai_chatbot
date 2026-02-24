@@ -15,8 +15,8 @@ const jetbrainsMono = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'LBS GenAI Chatbot',
-  description: 'LBS Buddy - MAM Teaching Assistant powered by Claude',
+  title: 'Chef Code Ramsay',
+  description: 'Brutally honest AI code reviews powered by Claude',
 }
 
 export default function RootLayout({
