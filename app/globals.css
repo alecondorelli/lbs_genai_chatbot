@@ -1,0 +1,116 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  background: #ffffff;
+  color: #1a1a1a;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #d0d0d0;
+  border-radius: 3px;
+}
+
+/* Markdown styles inside assistant messages */
+.assistant-message h1,
+.assistant-message h2,
+.assistant-message h3 {
+  margin-top: 0.8em;
+  margin-bottom: 0.4em;
+  font-weight: 600;
+  color: #111;
+}
+.assistant-message h1:first-child,
+.assistant-message h2:first-child,
+.assistant-message h3:first-child {
+  margin-top: 0;
+}
+.assistant-message h1 { font-size: 1.3em; }
+.assistant-message h2 { font-size: 1.15em; }
+.assistant-message h3 { font-size: 1.05em; }
+
+.assistant-message p {
+  margin-bottom: 0.6em;
+  line-height: 1.65;
+}
+.assistant-message p:last-child {
+  margin-bottom: 0;
+}
+
+.assistant-message ul,
+.assistant-message ol {
+  margin: 0.4em 0 0.6em 1.4em;
+}
+.assistant-message li {
+  margin-bottom: 0.3em;
+  line-height: 1.55;
+}
+
+.assistant-message code {
+  font-family: var(--font-jetbrains-mono), 'JetBrains Mono', monospace;
+  background: #f3f4f6;
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+  font-size: 0.88em;
+  color: #d6336c;
+}
+
+.assistant-message pre {
+  background: #f3f4f6;
+  padding: 0.8em 1em;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 0.6em 0;
+  border: 1px solid #e5e7eb;
+}
+.assistant-message pre code {
+  background: none;
+  padding: 0;
+  font-size: 0.85em;
+  color: #1a1a1a;
+}
+
+.assistant-message strong {
+  font-weight: 600;
+  color: #111;
+}
+
+.assistant-message a {
+  color: #2563eb;
+  text-decoration: underline;
+}
+
+.assistant-message blockquote {
+  border-left: 3px solid #d0d0d0;
+  padding-left: 0.8em;
+  margin: 0.5em 0;
+  color: #666;
+}
+
+/* Typing indicator */
+@keyframes blink {
+  0%, 80%, 100% { opacity: 0.3; }
+  40% { opacity: 1; }
+}
+.typing-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #aaa;
+  margin: 0 2px;
+  animation: blink 1.4s infinite;
+}
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
