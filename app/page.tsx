@@ -2,6 +2,8 @@
 
 import { useState, useRef, useEffect, useCallback, FormEvent, KeyboardEvent } from 'react'
 import ReactMarkdown from 'react-markdown'
+import remarkBreaks from 'remark-breaks'
+import remarkGfm from 'remark-gfm'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -292,7 +294,7 @@ export default function Home() {
                   }}
                 >
                   {message.role === 'assistant' ? (
-                    <ReactMarkdown>{message.content}</ReactMarkdown>
+                    <ReactMarkdown remarkPlugins={[remarkBreaks, remarkGfm]}>{message.content}</ReactMarkdown>
                   ) : (
                     message.content
                   )}

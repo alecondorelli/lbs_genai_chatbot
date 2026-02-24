@@ -23,38 +23,57 @@ html, body {
 }
 
 /* Markdown styles inside assistant messages */
+.assistant-message {
+  font-size: 14.5px;
+  line-height: 1.7;
+  color: #333;
+}
+
+.assistant-message > *:first-child {
+  margin-top: 0;
+}
+.assistant-message > *:last-child {
+  margin-bottom: 0;
+}
+
 .assistant-message h1,
 .assistant-message h2,
 .assistant-message h3 {
-  margin-top: 0.8em;
+  margin-top: 1em;
   margin-bottom: 0.4em;
-  font-weight: 600;
+  font-weight: 700;
   color: #111;
-}
-.assistant-message h1:first-child,
-.assistant-message h2:first-child,
-.assistant-message h3:first-child {
-  margin-top: 0;
+  line-height: 1.3;
 }
 .assistant-message h1 { font-size: 1.3em; }
 .assistant-message h2 { font-size: 1.15em; }
 .assistant-message h3 { font-size: 1.05em; }
 
 .assistant-message p {
-  margin-bottom: 0.6em;
-  line-height: 1.65;
+  margin-bottom: 0.75em;
+  line-height: 1.7;
 }
-.assistant-message p:last-child {
-  margin-bottom: 0;
+
+.assistant-message em {
+  font-style: italic;
+  color: #555;
+}
+
+.assistant-message strong {
+  font-weight: 700;
+  color: #111;
 }
 
 .assistant-message ul,
 .assistant-message ol {
-  margin: 0.4em 0 0.6em 1.4em;
+  margin: 0.5em 0 0.75em 1.5em;
 }
 .assistant-message li {
-  margin-bottom: 0.3em;
-  line-height: 1.55;
+  margin-bottom: 0.35em;
+  line-height: 1.6;
+}
+.assistant-message li > p {
+  margin-bottom: 0.25em;
 }
 
 .assistant-message code {
@@ -62,16 +81,16 @@ html, body {
   background: #f3f4f6;
   padding: 0.15em 0.4em;
   border-radius: 4px;
-  font-size: 0.88em;
+  font-size: 0.87em;
   color: #d6336c;
 }
 
 .assistant-message pre {
-  background: #f3f4f6;
-  padding: 0.8em 1em;
+  background: #f8f8fa;
+  padding: 12px 16px;
   border-radius: 8px;
   overflow-x: auto;
-  margin: 0.6em 0;
+  margin: 0.75em 0;
   border: 1px solid #e5e7eb;
 }
 .assistant-message pre code {
@@ -79,11 +98,7 @@ html, body {
   padding: 0;
   font-size: 0.85em;
   color: #1a1a1a;
-}
-
-.assistant-message strong {
-  font-weight: 600;
-  color: #111;
+  line-height: 1.55;
 }
 
 .assistant-message a {
@@ -94,8 +109,32 @@ html, body {
 .assistant-message blockquote {
   border-left: 3px solid #d0d0d0;
   padding-left: 0.8em;
-  margin: 0.5em 0;
+  margin: 0.6em 0;
   color: #666;
+  font-style: italic;
+}
+
+.assistant-message hr {
+  border: none;
+  border-top: 1px solid #e5e7eb;
+  margin: 1em 0;
+}
+
+.assistant-message table {
+  border-collapse: collapse;
+  margin: 0.75em 0;
+  width: 100%;
+}
+.assistant-message th,
+.assistant-message td {
+  border: 1px solid #e5e7eb;
+  padding: 6px 10px;
+  text-align: left;
+  font-size: 0.9em;
+}
+.assistant-message th {
+  background: #f8f8fa;
+  font-weight: 600;
 }
 
 /* Typing indicator */
