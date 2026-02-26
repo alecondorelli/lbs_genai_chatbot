@@ -108,6 +108,7 @@ function PaperclipIcon() {
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div
+      className="modal-overlay"
       onClick={onClose}
       style={{
         position: 'fixed',
@@ -121,6 +122,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
       }}
     >
       <div
+        className="modal-content"
         onClick={e => e.stopPropagation()}
         style={{
           background: '#fff',
@@ -142,19 +144,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
           flexShrink: 0,
         }}>
           <h3 style={{ fontSize: 15, fontWeight: 700, color: '#111' }}>{title}</h3>
-          <button
-            onClick={onClose}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              fontSize: 20,
-              color: '#999',
-              cursor: 'pointer',
-              padding: '0 4px',
-              lineHeight: 1,
-              fontFamily: 'inherit',
-            }}
-          >
+          <button onClick={onClose} className="modal-close-btn">
             &times;
           </button>
         </div>
@@ -173,6 +163,11 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 }
 
 export default function Home() {
+  const [authenticated, setAuthenticated] = useState(false)
+  const [authChecked, setAuthChecked] = useState(false)
+  const [password, setPassword] = useState('')
+  const [authError, setAuthError] = useState('')
+  const [authLoading, setAuthLoading] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -185,6 +180,49 @@ export default function Home() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const passwordInputRef = useRef<HTMLInputElement>(null)
+
+  // Check sessionStorage on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setAuthenticated(sessionStorage.getItem('chef_auth') === '1')
+    }
+    setAuthChecked(true)
+  }, [])
+
+  // Focus password input when login screen shows
+  useEffect(() => {
+    if (authChecked && !authenticated) {
+      passwordInputRef.current?.focus()
+    }
+  }, [authChecked, authenticated])
+
+  const handleLogin = useCallback(async (e: FormEvent) => {
+    e.preventDefault()
+    if (!password.trim() || authLoading) return
+    setAuthError('')
+    setAuthLoading(true)
+
+    try {
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        sessionStorage.setItem('chef_auth', '1')
+        setAuthenticated(true)
+      } else {
+        setAuthError('Wrong password. Try again, donkey!')
+        setPassword('')
+      }
+    } catch {
+      setAuthError('Something went wrong. Please try again.')
+    } finally {
+      setAuthLoading(false)
+    }
+  }, [password, authLoading])
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -331,6 +369,90 @@ export default function Home() {
 
   const canSend = (input.trim() || attachment) && !isLoading
 
+  // Don't render anything until sessionStorage check completes
+  if (!authChecked) return null
+
+  // Login screen
+  if (!authenticated) {
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
+        background: 'linear-gradient(180deg, rgba(239, 246, 255, 0.5) 0%, #fff 50%)',
+      }}>
+        <div className="modal-content" style={{
+          background: '#fff',
+          borderRadius: 16,
+          padding: '40px 36px 36px',
+          maxWidth: 380,
+          width: '100%',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.08)',
+          border: '1px solid #f0f0f0',
+          textAlign: 'center',
+        }}>
+          <div style={{ color: '#2563eb', marginBottom: 12 }}>
+            <ChefIcon size={44} />
+          </div>
+          <h1 style={{ fontSize: 20, fontWeight: 700, color: '#111', marginBottom: 4 }}>
+            Chef Code Ramsay
+          </h1>
+          <p style={{ color: '#999', fontSize: 13.5, marginBottom: 28 }}>
+            Enter the kitchen password
+          </p>
+          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <input
+              ref={passwordInputRef}
+              type="password"
+              value={password}
+              onChange={e => { setPassword(e.target.value); setAuthError('') }}
+              placeholder="Password"
+              style={{
+                width: '100%',
+                padding: '11px 14px',
+                borderRadius: 10,
+                border: `1px solid ${authError ? '#fca5a5' : '#e0e0e0'}`,
+                fontSize: 14.5,
+                fontFamily: 'inherit',
+                outline: 'none',
+                color: '#1a1a1a',
+                background: '#fff',
+                transition: 'border-color 0.15s ease',
+              }}
+              onFocus={e => { if (!authError) e.currentTarget.style.borderColor = '#bfdbfe' }}
+              onBlur={e => { if (!authError) e.currentTarget.style.borderColor = '#e0e0e0' }}
+            />
+            {authError && (
+              <p style={{ color: '#dc2626', fontSize: 13, margin: 0, textAlign: 'left' }}>
+                {authError}
+              </p>
+            )}
+            <button
+              type="submit"
+              disabled={!password.trim() || authLoading}
+              style={{
+                width: '100%',
+                padding: '11px 0',
+                borderRadius: 10,
+                border: 'none',
+                background: password.trim() && !authLoading ? '#2563eb' : '#e5e7eb',
+                color: password.trim() && !authLoading ? '#fff' : '#999',
+                fontSize: 14.5,
+                fontWeight: 600,
+                fontFamily: 'inherit',
+                cursor: password.trim() && !authLoading ? 'pointer' : 'default',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              {authLoading ? 'Signing in...' : 'Sign In'}
+            </button>
+          </form>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div style={{
       display: 'flex',
@@ -346,8 +468,9 @@ export default function Home() {
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '16px 0',
-        borderBottom: '1px solid #f0f0f0',
+        borderBottom: '1px solid #eee',
         flexShrink: 0,
+        background: 'linear-gradient(to bottom, rgba(239, 246, 255, 0.6), transparent)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ color: '#2563eb' }}>
@@ -363,20 +486,7 @@ export default function Home() {
           </div>
         </div>
         {messages.length > 0 && (
-          <button
-            onClick={clearChat}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: '#999',
-              padding: '4px 8px',
-              cursor: 'pointer',
-              fontSize: 13,
-              fontFamily: 'inherit',
-            }}
-            onMouseEnter={e => (e.currentTarget.style.color = '#555')}
-            onMouseLeave={e => (e.currentTarget.style.color = '#999')}
-          >
+          <button onClick={clearChat} className="clear-chat-btn">
             Clear chat
           </button>
         )}
@@ -387,6 +497,7 @@ export default function Home() {
         flex: 1,
         overflowY: 'auto',
         padding: '24px 0',
+        background: 'linear-gradient(180deg, rgba(248, 250, 252, 0.5) 0%, rgba(255,255,255,0) 120px)',
       }}>
         {messages.length === 0 ? (
           <div style={{
@@ -419,77 +530,31 @@ export default function Home() {
                 <button
                   key={suggestion}
                   onClick={() => sendMessage(suggestion)}
-                  style={{
-                    background: '#f7f7f8',
-                    border: '1px solid #e8e8eb',
-                    color: '#555',
-                    padding: '8px 16px',
-                    borderRadius: 20,
-                    cursor: 'pointer',
-                    fontSize: 13,
-                    lineHeight: 1.4,
-                    fontFamily: 'inherit',
-                    transition: 'all 0.15s',
-                  }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.background = '#eff6ff'
-                    e.currentTarget.style.borderColor = '#bfdbfe'
-                    e.currentTarget.style.color = '#2563eb'
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.background = '#f7f7f8'
-                    e.currentTarget.style.borderColor = '#e8e8eb'
-                    e.currentTarget.style.color = '#555'
-                  }}
+                  className="suggestion-chip"
                 >
                   {suggestion}
                 </button>
               ))}
             </div>
             <div style={{ display: 'flex', gap: 16, marginTop: 4 }}>
-              <button
-                onClick={() => setModal('prompt')}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: '#999',
-                  fontSize: 12.5,
-                  cursor: 'pointer',
-                  fontFamily: 'inherit',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 5,
-                }}
-                onMouseEnter={e => (e.currentTarget.style.color = '#2563eb')}
-                onMouseLeave={e => (e.currentTarget.style.color = '#999')}
-              >
+              <button onClick={() => setModal('prompt')} className="info-btn">
                 <InfoIcon /> View System Prompt
               </button>
-              <button
-                onClick={() => setModal('contribution')}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: '#999',
-                  fontSize: 12.5,
-                  cursor: 'pointer',
-                  fontFamily: 'inherit',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 5,
-                }}
-                onMouseEnter={e => (e.currentTarget.style.color = '#2563eb')}
-                onMouseLeave={e => (e.currentTarget.style.color = '#999')}
-              >
+              <button onClick={() => setModal('contribution')} className="info-btn">
                 <DocIcon /> View AI Contribution Log
               </button>
             </div>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {messages.map((message, index) => (
+            {messages.map((message, index) => {
+              // Hide empty assistant placeholder — typing dots cover this state
+              if (message.role === 'assistant' && !message.content && isLoading) return null
+              const isStreamingMsg = isLoading && message.role === 'assistant' && index === messages.length - 1 && !!message.content
+              return (
               <div
                 key={index}
+                className="message-fade-in"
                 style={{
                   display: 'flex',
                   justifyContent: message.role === 'user' ? 'flex-end' : 'flex-start',
@@ -499,7 +564,7 @@ export default function Home() {
               >
                 {message.role === 'assistant' && <BotIcon />}
                 <div
-                  className={message.role === 'assistant' ? 'assistant-message' : undefined}
+                  className={message.role === 'assistant' ? `assistant-message${isStreamingMsg ? ' streaming' : ''}` : undefined}
                   style={{
                     maxWidth: '78%',
                     padding: message.role === 'user' ? '10px 16px' : '2px 0',
@@ -518,9 +583,10 @@ export default function Home() {
                   )}
                 </div>
               </div>
-            ))}
-            {isLoading && messages[messages.length - 1]?.role !== 'assistant' && (
-              <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+              )
+            })}
+            {isLoading && !(messages[messages.length - 1]?.role === 'assistant' && messages[messages.length - 1]?.content) && (
+              <div className="typing-indicator" style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
                 <BotIcon />
                 <div style={{ paddingTop: 6 }}>
                   <span className="typing-dot" />
@@ -600,25 +666,16 @@ export default function Home() {
           borderRadius: 14,
           padding: '4px 4px 4px 8px',
           boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+          transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
         }}>
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={isLoading}
+            className="paperclip-btn"
             style={{
-              background: 'transparent',
-              border: 'none',
               color: attachment ? '#2563eb' : '#bbb',
-              cursor: isLoading ? 'default' : 'pointer',
-              padding: '8px 4px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-              transition: 'color 0.15s',
             }}
-            onMouseEnter={e => { if (!isLoading) e.currentTarget.style.color = '#2563eb' }}
-            onMouseLeave={e => { if (!attachment) e.currentTarget.style.color = '#bbb' }}
           >
             <PaperclipIcon />
           </button>
@@ -648,28 +705,13 @@ export default function Home() {
               type="button"
               onClick={() => setModelPickerOpen(prev => !prev)}
               disabled={isLoading}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 3,
-                padding: '8px 4px',
-                cursor: isLoading ? 'default' : 'pointer',
-                color: '#999',
-                fontSize: 12.5,
-                fontFamily: 'inherit',
-                whiteSpace: 'nowrap',
-                transition: 'color 0.15s',
-              }}
-              onMouseEnter={e => { if (!isLoading) e.currentTarget.style.color = '#555' }}
-              onMouseLeave={e => (e.currentTarget.style.color = '#999')}
+              className="model-picker-btn"
             >
               {MODELS.find(m => m.id === selectedModel)?.label ?? 'Model'}
               <ChevronIcon />
             </button>
             {modelPickerOpen && (
-              <div style={{
+              <div className="model-picker-dropdown" style={{
                 position: 'absolute',
                 bottom: '100%',
                 right: 0,
@@ -690,24 +732,11 @@ export default function Home() {
                       setSelectedModel(m.id)
                       setModelPickerOpen(false)
                     }}
+                    className="model-option"
                     style={{
-                      display: 'block',
-                      width: '100%',
-                      textAlign: 'left',
                       background: m.id === selectedModel ? '#f0f5ff' : 'transparent',
-                      border: 'none',
-                      padding: '9px 14px',
-                      fontSize: 13,
-                      fontFamily: 'inherit',
                       color: m.id === selectedModel ? '#2563eb' : '#333',
                       fontWeight: m.id === selectedModel ? 600 : 400,
-                      cursor: 'pointer',
-                    }}
-                    onMouseEnter={e => {
-                      if (m.id !== selectedModel) e.currentTarget.style.background = '#f7f7f8'
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.background = m.id === selectedModel ? '#f0f5ff' : 'transparent'
                     }}
                   >
                     {m.label}
@@ -719,20 +748,7 @@ export default function Home() {
           <button
             type="submit"
             disabled={!canSend}
-            style={{
-              background: canSend ? '#2563eb' : '#f3f4f6',
-              border: 'none',
-              borderRadius: 10,
-              width: 38,
-              height: 38,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: canSend ? '#fff' : '#bbb',
-              cursor: canSend ? 'pointer' : 'default',
-              flexShrink: 0,
-              transition: 'all 0.15s',
-            }}
+            className="send-btn"
           >
             <SendIcon />
           </button>
