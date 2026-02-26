@@ -165,6 +165,8 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 export default function Home() {
   const [authenticated, setAuthenticated] = useState(false)
   const [authChecked, setAuthChecked] = useState(false)
+  const [userName, setUserName] = useState('')
+  const [nameInput, setNameInput] = useState('')
   const [password, setPassword] = useState('')
   const [authError, setAuthError] = useState('')
   const [authLoading, setAuthLoading] = useState(false)
@@ -180,20 +182,24 @@ export default function Home() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const passwordInputRef = useRef<HTMLInputElement>(null)
+  const nameInputRef = useRef<HTMLInputElement>(null)
 
   // Check sessionStorage on mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      setAuthenticated(sessionStorage.getItem('chef_auth') === '1')
+      const isAuth = sessionStorage.getItem('chef_auth') === '1'
+      setAuthenticated(isAuth)
+      if (isAuth) {
+        setUserName(sessionStorage.getItem('chef_user') || '')
+      }
     }
     setAuthChecked(true)
   }, [])
 
-  // Focus password input when login screen shows
+  // Focus name input when login screen shows
   useEffect(() => {
     if (authChecked && !authenticated) {
-      passwordInputRef.current?.focus()
+      nameInputRef.current?.focus()
     }
   }, [authChecked, authenticated])
 
@@ -211,7 +217,10 @@ export default function Home() {
       })
       const data = await res.json()
       if (data.success) {
+        const name = nameInput.trim() || 'Chef'
         sessionStorage.setItem('chef_auth', '1')
+        sessionStorage.setItem('chef_user', name)
+        setUserName(name)
         setAuthenticated(true)
       } else {
         setAuthError('Wrong password. Try again, donkey!')
@@ -222,7 +231,15 @@ export default function Home() {
     } finally {
       setAuthLoading(false)
     }
-  }, [password, authLoading])
+  }, [password, nameInput, authLoading])
+
+  const getGreeting = useCallback(() => {
+    const hour = new Date().getHours()
+    const name = userName || 'Chef'
+    if (hour < 12) return `Good morning, ${name}! Ready to cook up some code?`
+    if (hour < 17) return `Good afternoon, ${name}! Let\u2019s get coding!`
+    return `Good evening, ${name}! Late night coding session?`
+  }, [userName])
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -403,16 +420,16 @@ export default function Home() {
           </p>
           <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <input
-              ref={passwordInputRef}
-              type="password"
-              value={password}
-              onChange={e => { setPassword(e.target.value); setAuthError('') }}
-              placeholder="Password"
+              ref={nameInputRef}
+              type="text"
+              value={nameInput}
+              onChange={e => setNameInput(e.target.value)}
+              placeholder="Your name"
               style={{
                 width: '100%',
                 padding: '11px 14px',
                 borderRadius: 10,
-                border: `1px solid ${authError ? '#fca5a5' : '#e0e0e0'}`,
+                border: '1px solid #e0e0e0',
                 fontSize: 14.5,
                 fontFamily: 'inherit',
                 outline: 'none',
@@ -420,9 +437,34 @@ export default function Home() {
                 background: '#fff',
                 transition: 'border-color 0.15s ease',
               }}
-              onFocus={e => { if (!authError) e.currentTarget.style.borderColor = '#bfdbfe' }}
-              onBlur={e => { if (!authError) e.currentTarget.style.borderColor = '#e0e0e0' }}
+              onFocus={e => (e.currentTarget.style.borderColor = '#bfdbfe')}
+              onBlur={e => (e.currentTarget.style.borderColor = '#e0e0e0')}
             />
+            <div>
+              <input
+                type="password"
+                value={password}
+                onChange={e => { setPassword(e.target.value); setAuthError('') }}
+                placeholder="Password"
+                style={{
+                  width: '100%',
+                  padding: '11px 14px',
+                  borderRadius: 10,
+                  border: `1px solid ${authError ? '#fca5a5' : '#e0e0e0'}`,
+                  fontSize: 14.5,
+                  fontFamily: 'inherit',
+                  outline: 'none',
+                  color: '#1a1a1a',
+                  background: '#fff',
+                  transition: 'border-color 0.15s ease',
+                }}
+                onFocus={e => { if (!authError) e.currentTarget.style.borderColor = '#bfdbfe' }}
+                onBlur={e => { if (!authError) e.currentTarget.style.borderColor = '#e0e0e0' }}
+              />
+              <p style={{ color: '#ccc', fontSize: 12, marginTop: 6, textAlign: 'left' }}>
+                Hint: chef2024
+              </p>
+            </div>
             {authError && (
               <p style={{ color: '#dc2626', fontSize: 13, margin: 0, textAlign: 'left' }}>
                 {authError}
@@ -513,7 +555,7 @@ export default function Home() {
                 <ChefIcon size={40} />
               </div>
               <h2 style={{ fontSize: 22, fontWeight: 700, color: '#111', marginBottom: 8 }}>
-                Hey! I&apos;m Chef Code Ramsay
+                {getGreeting()}
               </h2>
               <p style={{ color: '#888', fontSize: 15, maxWidth: 420, lineHeight: 1.5 }}>
                 Paste your code. I dare you.
