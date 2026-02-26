@@ -17,6 +17,12 @@ const SUGGESTIONS = [
   'Am I using Git wrong?',
 ]
 
+const MODELS = [
+  { id: 'anthropic/claude-sonnet', label: 'Claude Sonnet' },
+  { id: 'google/gemini-flash', label: 'Gemini Flash' },
+  { id: 'openai/gpt-4o-mini', label: 'GPT-4o Mini' },
+] as const
+
 function ChefIcon({ size = 24 }: { size?: number }) {
   return (
     <span style={{ fontSize: size * 0.85, lineHeight: 1 }} role="img" aria-label="chef">
@@ -56,6 +62,7 @@ export default function Home() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [selectedModel, setSelectedModel] = useState<string>(MODELS[0].id)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -88,7 +95,7 @@ export default function Home() {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: updatedMessages }),
+        body: JSON.stringify({ messages: updatedMessages, model: selectedModel }),
       })
 
       if (!response.ok) throw new Error('Failed to send message')
@@ -130,7 +137,7 @@ export default function Home() {
     } finally {
       setIsLoading(false)
     }
-  }, [messages, isLoading])
+  }, [messages, isLoading, selectedModel])
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
@@ -182,24 +189,48 @@ export default function Home() {
             </p>
           </div>
         </div>
-        {messages.length > 0 && (
-          <button
-            onClick={clearChat}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <select
+            value={selectedModel}
+            onChange={(e) => setSelectedModel(e.target.value)}
+            disabled={isLoading}
             style={{
-              background: 'transparent',
-              border: 'none',
-              color: '#999',
-              padding: '4px 8px',
-              cursor: 'pointer',
+              background: '#f7f7f8',
+              border: '1px solid #e0e0e0',
+              borderRadius: 8,
+              padding: '6px 10px',
               fontSize: 13,
               fontFamily: 'inherit',
+              color: '#333',
+              cursor: isLoading ? 'not-allowed' : 'pointer',
+              outline: 'none',
             }}
-            onMouseEnter={e => (e.currentTarget.style.color = '#555')}
-            onMouseLeave={e => (e.currentTarget.style.color = '#999')}
           >
-            Clear chat
-          </button>
-        )}
+            {MODELS.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.label}
+              </option>
+            ))}
+          </select>
+          {messages.length > 0 && (
+            <button
+              onClick={clearChat}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#999',
+                padding: '4px 8px',
+                cursor: 'pointer',
+                fontSize: 13,
+                fontFamily: 'inherit',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.color = '#555')}
+              onMouseLeave={e => (e.currentTarget.style.color = '#999')}
+            >
+              Clear chat
+            </button>
+          )}
+        </div>
       </header>
 
       {/* Messages area */}
@@ -379,7 +410,7 @@ export default function Home() {
           color: '#bbb',
           marginTop: 10,
         }}>
-          Powered by Claude · Where&apos;s the Error Handling?!
+          Powered by {MODELS.find(m => m.id === selectedModel)?.label ?? 'AI'} · Where&apos;s the Error Handling?!
         </p>
       </div>
     </div>
