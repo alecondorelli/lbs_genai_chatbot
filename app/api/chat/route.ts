@@ -4,10 +4,24 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 import { SYSTEM_PROMPT } from '@/lib/constants'
 import { checkContentFilter, INPUT_BLOCKED_MESSAGE, OUTPUT_BLOCKED_MESSAGE } from '@/lib/filters'
 
-// SDK clients
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-const google = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY!)
+// Lazy SDK clients — avoid instantiating at module scope so Vercel builds
+// don't crash when env vars are absent during static page collection.
+let _anthropic: Anthropic | null = null
+let _openai: OpenAI | null = null
+let _google: GoogleGenerativeAI | null = null
+
+function getAnthropic() {
+  if (!_anthropic) _anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  return _anthropic
+}
+function getOpenAI() {
+  if (!_openai) _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  return _openai
+}
+function getGoogle() {
+  if (!_google) _google = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY!)
+  return _google
+}
 
 const ALLOWED_MODELS = [
   'anthropic/claude-sonnet',
@@ -51,7 +65,7 @@ function buildAnthropicMessages(messages: ChatMessage[], image?: ImageAttachment
 
 function streamAnthropic(messages: ChatMessage[], image?: ImageAttachment): ReadableStream {
   const encoder = new TextEncoder()
-  const stream = anthropic.messages.stream({
+  const stream = getAnthropic().messages.stream({
     model: 'claude-sonnet-4-20250514',
     max_tokens: 1024,
     system: SYSTEM_PROMPT,
@@ -101,7 +115,7 @@ function streamOpenAI(messages: ChatMessage[], image?: ImageAttachment): Readabl
           }),
         ]
 
-        const stream = await openai.chat.completions.create({
+        const stream = await getOpenAI().chat.completions.create({
           model: 'gpt-4o-mini',
           max_tokens: 1024,
           stream: true,
@@ -127,7 +141,7 @@ function streamOpenAI(messages: ChatMessage[], image?: ImageAttachment): Readabl
 
 function streamGemini(messages: ChatMessage[], image?: ImageAttachment): ReadableStream {
   const encoder = new TextEncoder()
-  const model = google.getGenerativeModel({
+  const model = getGoogle().getGenerativeModel({
     model: 'gemini-2.0-flash',
     systemInstruction: SYSTEM_PROMPT,
   })
