@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback, FormEvent, KeyboardEvent } from 'react'
+import { useState, useRef, useEffect, useCallback, ChangeEvent, FormEvent, KeyboardEvent } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkBreaks from 'remark-breaks'
 import remarkGfm from 'remark-gfm'
@@ -10,6 +10,14 @@ interface Message {
   role: 'user' | 'assistant'
   content: string
 }
+
+interface Attachment {
+  base64: string
+  mimeType: string
+  previewUrl: string
+}
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
 
 const SUGGESTIONS = [
   'Review my Python code',
@@ -77,6 +85,14 @@ function DocIcon() {
       <line x1="16" y1="13" x2="8" y2="13" />
       <line x1="16" y1="17" x2="8" y2="17" />
       <polyline points="10 9 9 9 8 9" />
+    </svg>
+  )
+}
+
+function PaperclipIcon() {
+  return (
+    <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
     </svg>
   )
 }
@@ -154,8 +170,11 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false)
   const [selectedModel, setSelectedModel] = useState<string>(MODELS[0].id)
   const [modal, setModal] = useState<'prompt' | 'contribution' | null>(null)
+  const [attachment, setAttachment] = useState<Attachment | null>(null)
+  const [fileError, setFileError] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -173,8 +192,38 @@ export default function Home() {
     }
   }, [input])
 
+  const handleFileSelect = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+    setFileError('')
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (file.size > MAX_FILE_SIZE) {
+      setFileError('File must be under 5MB')
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = reader.result as string
+      const base64 = result.split(',')[1]
+      setAttachment({
+        base64,
+        mimeType: file.type,
+        previewUrl: result,
+      })
+    }
+    reader.readAsDataURL(file)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }, [])
+
+  const removeAttachment = useCallback(() => {
+    setAttachment(null)
+    setFileError('')
+  }, [])
+
   const sendMessage = useCallback(async (content: string) => {
-    if (!content.trim() || isLoading) return
+    if ((!content.trim() && !attachment) || isLoading) return
 
     const userMessage: Message = { role: 'user', content: content.trim() }
     const updatedMessages = [...messages, userMessage]
@@ -182,11 +231,23 @@ export default function Home() {
     setInput('')
     setIsLoading(true)
 
+    const currentAttachment = attachment
+    setAttachment(null)
+
     try {
+      const body: Record<string, unknown> = {
+        messages: updatedMessages,
+        model: selectedModel,
+      }
+      if (currentAttachment) {
+        body.image = currentAttachment.base64
+        body.mimeType = currentAttachment.mimeType
+      }
+
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: updatedMessages, model: selectedModel }),
+        body: JSON.stringify(body),
       })
 
       if (!response.ok) throw new Error('Failed to send message')
@@ -228,7 +289,7 @@ export default function Home() {
     } finally {
       setIsLoading(false)
     }
-  }, [messages, isLoading, selectedModel])
+  }, [messages, isLoading, selectedModel, attachment])
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
@@ -245,9 +306,10 @@ export default function Home() {
   const clearChat = () => {
     setMessages([])
     setInput('')
+    setAttachment(null)
   }
 
-  const canSend = input.trim() && !isLoading
+  const canSend = (input.trim() || attachment) && !isLoading
 
   return (
     <div style={{
@@ -482,16 +544,88 @@ export default function Home() {
         borderTop: '1px solid #f0f0f0',
         flexShrink: 0,
       }}>
+        {/* Attachment preview */}
+        {attachment && (
+          <div style={{ marginBottom: 8, display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+            <div style={{ position: 'relative', display: 'inline-block' }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={attachment.previewUrl}
+                alt="Attachment preview"
+                style={{
+                  width: 64,
+                  height: 64,
+                  objectFit: 'cover',
+                  borderRadius: 8,
+                  border: '1px solid #e0e0e0',
+                }}
+              />
+              <button
+                onClick={removeAttachment}
+                style={{
+                  position: 'absolute',
+                  top: -6,
+                  right: -6,
+                  width: 18,
+                  height: 18,
+                  borderRadius: '50%',
+                  background: '#555',
+                  color: '#fff',
+                  border: 'none',
+                  fontSize: 11,
+                  lineHeight: 1,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                &times;
+              </button>
+            </div>
+          </div>
+        )}
+        {fileError && (
+          <p style={{ color: '#dc2626', fontSize: 12.5, marginBottom: 6 }}>{fileError}</p>
+        )}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/jpg,image/gif,image/webp"
+          onChange={handleFileSelect}
+          style={{ display: 'none' }}
+        />
         <form onSubmit={handleSubmit} style={{
           display: 'flex',
-          gap: 10,
+          gap: 6,
           alignItems: 'flex-end',
           background: '#fff',
           border: '1px solid #e0e0e0',
           borderRadius: 14,
-          padding: '4px 4px 4px 16px',
+          padding: '4px 4px 4px 8px',
           boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
         }}>
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isLoading}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: attachment ? '#2563eb' : '#bbb',
+              cursor: isLoading ? 'default' : 'pointer',
+              padding: '8px 4px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              transition: 'color 0.15s',
+            }}
+            onMouseEnter={e => { if (!isLoading) e.currentTarget.style.color = '#2563eb' }}
+            onMouseLeave={e => { if (!attachment) e.currentTarget.style.color = '#bbb' }}
+          >
+            <PaperclipIcon />
+          </button>
           <textarea
             ref={textareaRef}
             value={input}

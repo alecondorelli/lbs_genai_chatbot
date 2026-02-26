@@ -21,16 +21,40 @@ interface ChatMessage {
   content: string
 }
 
-function streamAnthropic(messages: ChatMessage[]): ReadableStream {
+interface ImageAttachment {
+  base64: string
+  mimeType: string
+}
+
+// Build Anthropic message content blocks
+function buildAnthropicMessages(messages: ChatMessage[], image?: ImageAttachment) {
+  return messages.map((m, i) => {
+    const isLast = i === messages.length - 1
+    if (isLast && m.role === 'user' && image) {
+      const content: Anthropic.MessageCreateParams['messages'][0]['content'] = [
+        {
+          type: 'image' as const,
+          source: {
+            type: 'base64' as const,
+            media_type: image.mimeType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
+            data: image.base64,
+          },
+        },
+        { type: 'text' as const, text: m.content || 'What do you see in this image?' },
+      ]
+      return { role: m.role as 'user' | 'assistant', content }
+    }
+    return { role: m.role as 'user' | 'assistant', content: m.content }
+  })
+}
+
+function streamAnthropic(messages: ChatMessage[], image?: ImageAttachment): ReadableStream {
   const encoder = new TextEncoder()
   const stream = anthropic.messages.stream({
     model: 'claude-sonnet-4-20250514',
     max_tokens: 1024,
     system: SYSTEM_PROMPT,
-    messages: messages.map(m => ({
-      role: m.role as 'user' | 'assistant',
-      content: m.content,
-    })),
+    messages: buildAnthropicMessages(messages, image),
   })
 
   return new ReadableStream({
@@ -50,23 +74,37 @@ function streamAnthropic(messages: ChatMessage[]): ReadableStream {
   })
 }
 
-function streamOpenAI(messages: ChatMessage[]): ReadableStream {
+function streamOpenAI(messages: ChatMessage[], image?: ImageAttachment): ReadableStream {
   const encoder = new TextEncoder()
 
   return new ReadableStream({
     async start(controller) {
       try {
+        const oaiMessages: OpenAI.ChatCompletionMessageParam[] = [
+          { role: 'system', content: SYSTEM_PROMPT },
+          ...messages.map((m, i) => {
+            const isLast = i === messages.length - 1
+            if (isLast && m.role === 'user' && image) {
+              return {
+                role: 'user' as const,
+                content: [
+                  {
+                    type: 'image_url' as const,
+                    image_url: { url: `data:${image.mimeType};base64,${image.base64}` },
+                  },
+                  { type: 'text' as const, text: m.content || 'What do you see in this image?' },
+                ],
+              }
+            }
+            return { role: m.role as 'user' | 'assistant', content: m.content }
+          }),
+        ]
+
         const stream = await openai.chat.completions.create({
           model: 'gpt-4o-mini',
           max_tokens: 1024,
           stream: true,
-          messages: [
-            { role: 'system' as const, content: SYSTEM_PROMPT },
-            ...messages.map(m => ({
-              role: m.role as 'user' | 'assistant',
-              content: m.content,
-            })),
-          ],
+          messages: oaiMessages,
         })
 
         for await (const chunk of stream) {
@@ -86,7 +124,7 @@ function streamOpenAI(messages: ChatMessage[]): ReadableStream {
   })
 }
 
-function streamGemini(messages: ChatMessage[]): ReadableStream {
+function streamGemini(messages: ChatMessage[], image?: ImageAttachment): ReadableStream {
   const encoder = new TextEncoder()
   const model = google.getGenerativeModel({
     model: 'gemini-2.0-flash',
@@ -98,13 +136,20 @@ function streamGemini(messages: ChatMessage[]): ReadableStream {
     parts: [{ text: m.content }],
   }))
 
-  const lastMessage = messages[messages.length - 1].content
+  const lastMessage = messages[messages.length - 1]
+
+  // Build parts for the last message, optionally including the image
+  const lastParts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = []
+  if (image) {
+    lastParts.push({ inlineData: { mimeType: image.mimeType, data: image.base64 } })
+  }
+  lastParts.push({ text: lastMessage.content || 'What do you see in this image?' })
 
   return new ReadableStream({
     async start(controller) {
       try {
         const chat = model.startChat({ history: geminiHistory })
-        const result = await chat.sendMessageStream(lastMessage)
+        const result = await chat.sendMessageStream(lastParts)
 
         for await (const chunk of result.stream) {
           const text = chunk.text()
@@ -125,7 +170,7 @@ function streamGemini(messages: ChatMessage[]): ReadableStream {
 
 export async function POST(req: Request) {
   try {
-    const { messages, model } = await req.json()
+    const { messages, model, image, mimeType } = await req.json()
 
     if (!messages || !Array.isArray(messages)) {
       return new Response(JSON.stringify({ error: 'Messages array is required' }), {
@@ -138,17 +183,20 @@ export async function POST(req: Request) {
       ? (model as ModelId)
       : 'anthropic/claude-sonnet'
 
+    const attachment: ImageAttachment | undefined =
+      image && mimeType ? { base64: image, mimeType } : undefined
+
     let readable: ReadableStream
 
     switch (selectedModel) {
       case 'anthropic/claude-sonnet':
-        readable = streamAnthropic(messages)
+        readable = streamAnthropic(messages, attachment)
         break
       case 'openai/gpt-4o-mini':
-        readable = streamOpenAI(messages)
+        readable = streamOpenAI(messages, attachment)
         break
       case 'google/gemini-flash':
-        readable = streamGemini(messages)
+        readable = streamGemini(messages, attachment)
         break
     }
 
