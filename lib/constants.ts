@@ -76,3 +76,28 @@ Claude was used as a development assistant throughout the project, helping with 
 ## Transparency
 
 This project was built for the Generative AI Product Design course at London Business School. AI assistance was used openly and is documented here as part of the assignment requirements. All code was reviewed and understood by the developer before inclusion.`
+
+export const FEATURES_MD = `# Features
+
+## Optional Improvements (All 6 Implemented)
+
+- **Streaming Responses:** Real-time token-by-token display via Server-Sent Events (SSE), with a blinking cursor indicator during generation
+- **Custom UI / Styling:** Fully custom Next.js interface with system fonts, ChatGPT-inspired input bar, smooth animations, and responsive design
+- **Model Selection UI:** Switch between Claude Sonnet, Gemini Flash, and GPT-4o Mini directly from the input bar
+- **Multimodal Inputs:** Attach images via the paperclip icon for visual analysis across all three model providers
+- **Authentication:** Login screen with personalized time-based greeting using the user's name
+- **Safety / Content Filters:** Three-layer safety system combining system prompt guardrails, client-side input filters, and server-side output filters
+
+## Additional Features
+
+- **Multi-Provider Architecture:** Three AI providers (Anthropic, Google, OpenAI) unified under a single streaming interface
+- **Conversation Memory:** Full chat history sent with every request for contextual responses
+- **Chef Code Ramsay Persona:** Custom system prompt with adaptive behavior that adjusts intensity based on user skill level
+- **Markdown Rendering:** Full support for bold, italic, code blocks, lists, and tables via react-markdown
+- **Suggestion Chips:** Quick-start prompts for new users on the empty state
+- **Responsive Design:** Works across desktop and mobile viewports
+- **Transparent AI Usage:** System prompt and AI contribution log viewable directly in the app
+
+## Tech Stack
+
+Next.js 14 · React 18 · TypeScript · Anthropic Claude SDK · Google Generative AI SDK · OpenAI SDK · react-markdown · remark-gfm · remark-breaks`

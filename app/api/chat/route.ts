@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import OpenAI from 'openai'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { SYSTEM_PROMPT } from '@/lib/constants'
+import { checkContentFilter, INPUT_BLOCKED_MESSAGE, OUTPUT_BLOCKED_MESSAGE } from '@/lib/filters'
 
 // SDK clients
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
@@ -61,7 +62,7 @@ function streamAnthropic(messages: ChatMessage[], image?: ImageAttachment): Read
     async start(controller) {
       try {
         stream.on('text', (text) => {
-          controller.enqueue(encoder.encode(`data: ${text}\n\n`))
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(text)}\n\n`))
         })
         await stream.finalMessage()
         controller.enqueue(encoder.encode('data: [DONE]\n\n'))
@@ -110,7 +111,7 @@ function streamOpenAI(messages: ChatMessage[], image?: ImageAttachment): Readabl
         for await (const chunk of stream) {
           const text = chunk.choices[0]?.delta?.content
           if (text) {
-            controller.enqueue(encoder.encode(`data: ${text}\n\n`))
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(text)}\n\n`))
           }
         }
 
@@ -154,7 +155,7 @@ function streamGemini(messages: ChatMessage[], image?: ImageAttachment): Readabl
         for await (const chunk of result.stream) {
           const text = chunk.text()
           if (text) {
-            controller.enqueue(encoder.encode(`data: ${text}\n\n`))
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(text)}\n\n`))
           }
         }
 
@@ -162,6 +163,60 @@ function streamGemini(messages: ChatMessage[], image?: ImageAttachment): Readabl
         controller.close()
       } catch (error) {
         console.error('Gemini stream error:', error)
+        controller.error(error)
+      }
+    },
+  })
+}
+
+/**
+ * Wraps a readable SSE stream to buffer the full response and check it
+ * against the content filter once streaming completes. If flagged, the
+ * buffered tokens are discarded and a single safety notice is sent instead.
+ */
+function filterOutputStream(source: ReadableStream): ReadableStream {
+  const encoder = new TextEncoder()
+
+  return new ReadableStream({
+    async start(controller) {
+      const reader = source.getReader()
+      const decoder = new TextDecoder()
+      const bufferedChunks: Uint8Array[] = []
+      let accumulated = ''
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+
+          // Collect raw bytes so we can replay them if clean
+          bufferedChunks.push(value)
+
+          // Also parse out the text tokens to build the accumulated string
+          const chunk = decoder.decode(value, { stream: true })
+          for (const line of chunk.split('\n')) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6)
+              if (data === '[DONE]') continue
+              try { accumulated += JSON.parse(data) } catch { accumulated += data }
+            }
+          }
+        }
+
+        // Check accumulated output
+        if (checkContentFilter(accumulated)) {
+          // Send the safety warning instead of the real content
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(OUTPUT_BLOCKED_MESSAGE)}\n\n`))
+        } else {
+          // Replay all buffered chunks as-is
+          for (const chunk of bufferedChunks) {
+            controller.enqueue(chunk)
+          }
+        }
+
+        controller.enqueue(encoder.encode('data: [DONE]\n\n'))
+        controller.close()
+      } catch (error) {
         controller.error(error)
       }
     },
@@ -176,6 +231,26 @@ export async function POST(req: Request) {
       return new Response(JSON.stringify({ error: 'Messages array is required' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
+      })
+    }
+
+    // --- Backend input filter: reject flagged messages before calling any AI ---
+    const lastMessage = messages[messages.length - 1]
+    if (lastMessage?.role === 'user' && checkContentFilter(lastMessage.content)) {
+      const encoder = new TextEncoder()
+      const blocked = new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(INPUT_BLOCKED_MESSAGE)}\n\n`))
+          controller.enqueue(encoder.encode('data: [DONE]\n\n'))
+          controller.close()
+        },
+      })
+      return new Response(blocked, {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+        },
       })
     }
 
@@ -203,7 +278,10 @@ export async function POST(req: Request) {
         break
     }
 
-    return new Response(readable, {
+    // --- Backend output filter: wrap the stream to check the full response ---
+    const filtered = filterOutputStream(readable)
+
+    return new Response(filtered, {
       headers: {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',

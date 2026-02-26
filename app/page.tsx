@@ -4,7 +4,8 @@ import { useState, useRef, useEffect, useCallback, ChangeEvent, FormEvent, Keybo
 import ReactMarkdown from 'react-markdown'
 import remarkBreaks from 'remark-breaks'
 import remarkGfm from 'remark-gfm'
-import { SYSTEM_PROMPT, AI_CONTRIBUTION_MD } from '@/lib/constants'
+import { SYSTEM_PROMPT, AI_CONTRIBUTION_MD, FEATURES_MD } from '@/lib/constants'
+import { checkContentFilter, INPUT_BLOCKED_MESSAGE, OUTPUT_BLOCKED_MESSAGE, SAFETY_POLICY_MD } from '@/lib/filters'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -97,6 +98,22 @@ function ChevronIcon() {
   )
 }
 
+function SparkleIcon() {
+  return (
+    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2l2.09 6.26L20 10l-5.91 1.74L12 18l-2.09-6.26L4 10l5.91-1.74L12 2z" />
+    </svg>
+  )
+}
+
+function ShieldIcon() {
+  return (
+    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    </svg>
+  )
+}
+
 function PaperclipIcon() {
   return (
     <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -173,7 +190,7 @@ export default function Home() {
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [selectedModel, setSelectedModel] = useState<string>(MODELS[0].id)
-  const [modal, setModal] = useState<'prompt' | 'contribution' | null>(null)
+  const [modal, setModal] = useState<'prompt' | 'contribution' | 'safety' | 'features' | null>(null)
   const [attachment, setAttachment] = useState<Attachment | null>(null)
   const [fileError, setFileError] = useState('')
   const [modelPickerOpen, setModelPickerOpen] = useState(false)
@@ -282,6 +299,18 @@ export default function Home() {
   const sendMessage = useCallback(async (content: string) => {
     if ((!content.trim() && !attachment) || isLoading) return
 
+    // --- Input filter (frontend) ---
+    if (content.trim() && checkContentFilter(content.trim())) {
+      const userMessage: Message = { role: 'user', content: content.trim() }
+      setMessages(prev => [
+        ...prev,
+        userMessage,
+        { role: 'assistant', content: INPUT_BLOCKED_MESSAGE },
+      ])
+      setInput('')
+      return
+    }
+
     const userMessage: Message = { role: 'user', content: content.trim() }
     const updatedMessages = [...messages, userMessage]
     setMessages(updatedMessages)
@@ -328,7 +357,7 @@ export default function Home() {
           if (line.startsWith('data: ')) {
             const data = line.slice(6)
             if (data === '[DONE]') break
-            assistantContent += data
+            try { assistantContent += JSON.parse(data) } catch { assistantContent += data }
             const currentContent = assistantContent
             setMessages(prev => {
               const updated = [...prev]
@@ -337,6 +366,15 @@ export default function Home() {
             })
           }
         }
+      }
+
+      // --- Output filter (frontend check after streaming completes) ---
+      if (checkContentFilter(assistantContent)) {
+        setMessages(prev => {
+          const updated = [...prev]
+          updated[updated.length - 1] = { role: 'assistant', content: OUTPUT_BLOCKED_MESSAGE }
+          return updated
+        })
       }
     } catch {
       setMessages(prev => [
@@ -412,7 +450,7 @@ export default function Home() {
                 padding: '11px 14px',
                 borderRadius: 10,
                 border: '1px solid #e0e0e0',
-                fontSize: 14.5,
+                fontSize: 15,
                 fontFamily: 'inherit',
                 outline: 'none',
                 color: '#1a1a1a',
@@ -433,7 +471,7 @@ export default function Home() {
                   padding: '11px 14px',
                   borderRadius: 10,
                   border: `1px solid ${authError ? '#fca5a5' : '#e0e0e0'}`,
-                  fontSize: 14.5,
+                  fontSize: 15,
                   fontFamily: 'inherit',
                   outline: 'none',
                   color: '#1a1a1a',
@@ -459,7 +497,7 @@ export default function Home() {
                 border: 'none',
                 background: nameInput.trim() && password.trim() ? '#2563eb' : '#e5e7eb',
                 color: nameInput.trim() && password.trim() ? '#fff' : '#999',
-                fontSize: 14.5,
+                fontSize: 15,
                 fontWeight: 600,
                 fontFamily: 'inherit',
                 cursor: nameInput.trim() && password.trim() ? 'pointer' : 'default',
@@ -557,12 +595,18 @@ export default function Home() {
                 </button>
               ))}
             </div>
-            <div style={{ display: 'flex', gap: 16, marginTop: 4 }}>
+            <div style={{ display: 'flex', gap: 16, marginTop: 4, flexWrap: 'wrap', justifyContent: 'center' }}>
               <button onClick={() => setModal('prompt')} className="info-btn">
                 <InfoIcon /> View System Prompt
               </button>
               <button onClick={() => setModal('contribution')} className="info-btn">
                 <DocIcon /> View AI Contribution Log
+              </button>
+              <button onClick={() => setModal('safety')} className="info-btn">
+                <ShieldIcon /> View Safety Policy
+              </button>
+              <button onClick={() => setModal('features')} className="info-btn">
+                <SparkleIcon /> View Features
               </button>
             </div>
           </div>
@@ -594,7 +638,7 @@ export default function Home() {
                     borderRadius: message.role === 'user' ? 18 : 0,
                     background: message.role === 'user' ? '#2563eb' : 'transparent',
                     color: message.role === 'user' ? '#fff' : '#333',
-                    fontSize: 14.5,
+                    fontSize: 15,
                     lineHeight: 1.6,
                     wordBreak: 'break-word',
                     overflowWrap: 'break-word',
@@ -716,7 +760,7 @@ export default function Home() {
               border: 'none',
               padding: '10px 0',
               color: '#1a1a1a',
-              fontSize: 14.5,
+              fontSize: 15,
               fontFamily: 'inherit',
               resize: 'none',
               outline: 'none',
@@ -782,8 +826,15 @@ export default function Home() {
           fontSize: 11.5,
           color: '#bbb',
           marginTop: 10,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 6,
         }}>
-          Powered by {MODELS.find(m => m.id === selectedModel)?.label ?? 'AI'} · Where&apos;s the Error Handling?!
+          <span>Powered by {MODELS.find(m => m.id === selectedModel)?.label ?? 'AI'} · Where&apos;s the Error Handling?!</span>
+          <span className="filter-badge">
+            <ShieldIcon /> Content filters active
+          </span>
         </p>
       </div>
 
@@ -793,7 +844,7 @@ export default function Home() {
           <pre style={{
             whiteSpace: 'pre-wrap',
             wordBreak: 'break-word',
-            fontFamily: 'var(--font-jetbrains-mono), monospace',
+            fontFamily: '"SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace',
             fontSize: 13,
             lineHeight: 1.65,
             background: '#f8f8fa',
@@ -808,6 +859,16 @@ export default function Home() {
       {modal === 'contribution' && (
         <Modal title="AI Contribution Log" onClose={() => setModal(null)}>
           <ReactMarkdown remarkPlugins={[remarkBreaks, remarkGfm]}>{AI_CONTRIBUTION_MD}</ReactMarkdown>
+        </Modal>
+      )}
+      {modal === 'safety' && (
+        <Modal title="Safety Policy" onClose={() => setModal(null)}>
+          <ReactMarkdown remarkPlugins={[remarkBreaks, remarkGfm]}>{SAFETY_POLICY_MD}</ReactMarkdown>
+        </Modal>
+      )}
+      {modal === 'features' && (
+        <Modal title="Features" onClose={() => setModal(null)}>
+          <ReactMarkdown remarkPlugins={[remarkBreaks, remarkGfm]}>{FEATURES_MD}</ReactMarkdown>
         </Modal>
       )}
     </div>
