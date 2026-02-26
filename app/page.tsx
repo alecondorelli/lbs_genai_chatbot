@@ -581,6 +581,7 @@ export default function Home() {
                   justifyContent: message.role === 'user' ? 'flex-end' : 'flex-start',
                   gap: 10,
                   alignItems: 'flex-start',
+                  minWidth: 0,
                 }}
               >
                 {message.role === 'assistant' && <BotIcon />}
@@ -588,6 +589,7 @@ export default function Home() {
                   className={message.role === 'assistant' ? `assistant-message${isStreamingMsg ? ' streaming' : ''}` : undefined}
                   style={{
                     maxWidth: '78%',
+                    minWidth: 0,
                     padding: message.role === 'user' ? '10px 16px' : '2px 0',
                     borderRadius: message.role === 'user' ? 18 : 0,
                     background: message.role === 'user' ? '#2563eb' : 'transparent',
@@ -595,6 +597,7 @@ export default function Home() {
                     fontSize: 14.5,
                     lineHeight: 1.6,
                     wordBreak: 'break-word',
+                    overflowWrap: 'break-word',
                   }}
                 >
                   {message.role === 'assistant' ? (

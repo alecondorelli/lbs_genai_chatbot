@@ -94,6 +94,9 @@ html, body {
   font-size: 14.5px;
   line-height: 1.7;
   color: #333;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  min-width: 0;
 }
 
 .assistant-message > *:first-child {
@@ -150,6 +153,8 @@ html, body {
   border-radius: 4px;
   font-size: 0.87em;
   color: #d6336c;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .assistant-message pre {
@@ -159,6 +164,7 @@ html, body {
   overflow-x: auto;
   margin: 0.75em 0;
   border: 1px solid #e5e7eb;
+  max-width: 100%;
 }
 .assistant-message pre code {
   background: none;
@@ -166,6 +172,8 @@ html, body {
   font-size: 0.85em;
   color: #1a1a1a;
   line-height: 1.55;
+  word-break: normal;
+  overflow-wrap: normal;
 }
 
 .assistant-message a {
@@ -191,6 +199,8 @@ html, body {
   border-collapse: collapse;
   margin: 0.75em 0;
   width: 100%;
+  display: block;
+  overflow-x: auto;
 }
 .assistant-message th,
 .assistant-message td {

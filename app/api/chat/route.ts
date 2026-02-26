@@ -198,6 +198,9 @@ export async function POST(req: Request) {
       case 'google/gemini-flash':
         readable = streamGemini(messages, attachment)
         break
+      default:
+        readable = streamAnthropic(messages, attachment)
+        break
     }
 
     return new Response(readable, {
