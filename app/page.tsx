@@ -16,9 +16,12 @@ interface Attachment {
   base64: string
   mimeType: string
   previewUrl: string
+  fileName?: string
 }
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024   // 5MB
+const MAX_PDF_SIZE = 10 * 1024 * 1024    // 10MB
+const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp']
 
 const SUGGESTIONS = [
   'Review my Python code',
@@ -271,8 +274,11 @@ export default function Home() {
     const file = e.target.files?.[0]
     if (!file) return
 
-    if (file.size > MAX_FILE_SIZE) {
-      setFileError('File must be under 5MB')
+    const isPdf = file.type === 'application/pdf'
+    const maxSize = isPdf ? MAX_PDF_SIZE : MAX_IMAGE_SIZE
+
+    if (file.size > maxSize) {
+      setFileError(isPdf ? 'PDF must be under 10MB' : 'Image must be under 5MB')
       if (fileInputRef.current) fileInputRef.current.value = ''
       return
     }
@@ -285,6 +291,7 @@ export default function Home() {
         base64,
         mimeType: file.type,
         previewUrl: result,
+        fileName: isPdf ? file.name : undefined,
       })
     }
     reader.readAsDataURL(file)
@@ -298,6 +305,12 @@ export default function Home() {
 
   const sendMessage = useCallback(async (content: string) => {
     if ((!content.trim() && !attachment) || isLoading) return
+
+    // --- Block PDF with OpenAI (not supported) ---
+    if (attachment?.mimeType === 'application/pdf' && selectedModel === 'openai/gpt-4o-mini') {
+      setFileError('PDF analysis is only available with Claude and Gemini')
+      return
+    }
 
     // --- Input filter (frontend) ---
     if (content.trim() && checkContentFilter(content.trim())) {
@@ -678,18 +691,41 @@ export default function Home() {
         {attachment && (
           <div style={{ marginBottom: 8, display: 'flex', alignItems: 'flex-start', gap: 6 }}>
             <div style={{ position: 'relative', display: 'inline-block' }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={attachment.previewUrl}
-                alt="Attachment preview"
-                style={{
+              {attachment.mimeType === 'application/pdf' ? (
+                <div style={{
                   width: 64,
                   height: 64,
-                  objectFit: 'cover',
                   borderRadius: 8,
                   border: '1px solid #e0e0e0',
-                }}
-              />
+                  background: '#f8f8fa',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 2,
+                }}>
+                  <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                  </svg>
+                  <span style={{ fontSize: 8, color: '#999', maxWidth: 56, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center' }}>
+                    {attachment.fileName || 'PDF'}
+                  </span>
+                </div>
+              ) : (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={attachment.previewUrl}
+                  alt="Attachment preview"
+                  style={{
+                    width: 64,
+                    height: 64,
+                    objectFit: 'cover',
+                    borderRadius: 8,
+                    border: '1px solid #e0e0e0',
+                  }}
+                />
+              )}
               <button
                 onClick={removeAttachment}
                 style={{
@@ -721,7 +757,7 @@ export default function Home() {
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/png,image/jpeg,image/jpg,image/gif,image/webp"
+          accept="image/png,image/jpeg,image/jpg,image/gif,image/webp,application/pdf"
           onChange={handleFileSelect}
           style={{ display: 'none' }}
         />

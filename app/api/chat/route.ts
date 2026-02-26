@@ -36,26 +36,38 @@ interface ChatMessage {
   content: string
 }
 
-interface ImageAttachment {
+interface FileAttachment {
   base64: string
   mimeType: string
 }
 
-// Build Anthropic message content blocks
-function buildAnthropicMessages(messages: ChatMessage[], image?: ImageAttachment) {
+// Build Anthropic message content blocks (supports images + PDFs)
+function buildAnthropicMessages(messages: ChatMessage[], file?: FileAttachment) {
   return messages.map((m, i) => {
     const isLast = i === messages.length - 1
-    if (isLast && m.role === 'user' && image) {
-      const content: Anthropic.MessageCreateParams['messages'][0]['content'] = [
-        {
-          type: 'image' as const,
-          source: {
-            type: 'base64' as const,
-            media_type: image.mimeType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
-            data: image.base64,
-          },
-        },
-        { type: 'text' as const, text: m.content || 'What do you see in this image?' },
+    if (isLast && m.role === 'user' && file) {
+      const isPdf = file.mimeType === 'application/pdf'
+      const fileBlock = isPdf
+        ? {
+            type: 'document' as const,
+            source: {
+              type: 'base64' as const,
+              media_type: 'application/pdf' as const,
+              data: file.base64,
+            },
+          }
+        : {
+            type: 'image' as const,
+            source: {
+              type: 'base64' as const,
+              media_type: file.mimeType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
+              data: file.base64,
+            },
+          }
+      const defaultPrompt = isPdf ? 'What is in this PDF?' : 'What do you see in this image?'
+      const content = [
+        fileBlock,
+        { type: 'text' as const, text: m.content || defaultPrompt },
       ]
       return { role: m.role as 'user' | 'assistant', content }
     }
@@ -63,13 +75,13 @@ function buildAnthropicMessages(messages: ChatMessage[], image?: ImageAttachment
   })
 }
 
-function streamAnthropic(messages: ChatMessage[], image?: ImageAttachment): ReadableStream {
+function streamAnthropic(messages: ChatMessage[], file?: FileAttachment): ReadableStream {
   const encoder = new TextEncoder()
   const stream = getAnthropic().messages.stream({
     model: 'claude-sonnet-4-20250514',
     max_tokens: 1024,
     system: SYSTEM_PROMPT,
-    messages: buildAnthropicMessages(messages, image),
+    messages: buildAnthropicMessages(messages, file),
   })
 
   return new ReadableStream({
@@ -89,8 +101,10 @@ function streamAnthropic(messages: ChatMessage[], image?: ImageAttachment): Read
   })
 }
 
-function streamOpenAI(messages: ChatMessage[], image?: ImageAttachment): ReadableStream {
+function streamOpenAI(messages: ChatMessage[], file?: FileAttachment): ReadableStream {
   const encoder = new TextEncoder()
+  // OpenAI doesn't support PDF uploads — only pass image attachments
+  const image = file && file.mimeType !== 'application/pdf' ? file : undefined
 
   return new ReadableStream({
     async start(controller) {
@@ -139,7 +153,7 @@ function streamOpenAI(messages: ChatMessage[], image?: ImageAttachment): Readabl
   })
 }
 
-function streamGemini(messages: ChatMessage[], image?: ImageAttachment): ReadableStream {
+function streamGemini(messages: ChatMessage[], file?: FileAttachment): ReadableStream {
   const encoder = new TextEncoder()
   const model = getGoogle().getGenerativeModel({
     model: 'gemini-2.0-flash',
@@ -153,12 +167,14 @@ function streamGemini(messages: ChatMessage[], image?: ImageAttachment): Readabl
 
   const lastMessage = messages[messages.length - 1]
 
-  // Build parts for the last message, optionally including the image
+  // Build parts for the last message, optionally including image or PDF
   const lastParts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = []
-  if (image) {
-    lastParts.push({ inlineData: { mimeType: image.mimeType, data: image.base64 } })
+  if (file) {
+    lastParts.push({ inlineData: { mimeType: file.mimeType, data: file.base64 } })
   }
-  lastParts.push({ text: lastMessage.content || 'What do you see in this image?' })
+  const isPdf = file?.mimeType === 'application/pdf'
+  const defaultPrompt = isPdf ? 'What is in this PDF?' : 'What do you see in this image?'
+  lastParts.push({ text: lastMessage.content || defaultPrompt })
 
   return new ReadableStream({
     async start(controller) {
@@ -272,7 +288,7 @@ export async function POST(req: Request) {
       ? (model as ModelId)
       : 'anthropic/claude-sonnet'
 
-    const attachment: ImageAttachment | undefined =
+    const attachment: FileAttachment | undefined =
       image && mimeType ? { base64: image, mimeType } : undefined
 
     let readable: ReadableStream
