@@ -169,7 +169,6 @@ export default function Home() {
   const [nameInput, setNameInput] = useState('')
   const [password, setPassword] = useState('')
   const [authError, setAuthError] = useState('')
-  const [authLoading, setAuthLoading] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -203,35 +202,18 @@ export default function Home() {
     }
   }, [authChecked, authenticated])
 
-  const handleLogin = useCallback(async (e: FormEvent) => {
+  const handleLogin = useCallback((e: FormEvent) => {
     e.preventDefault()
-    if (!password.trim() || authLoading) return
-    setAuthError('')
-    setAuthLoading(true)
-
-    try {
-      const res = await fetch('/api/auth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
-      })
-      const data = await res.json()
-      if (data.success) {
-        const name = nameInput.trim() || 'Chef'
-        sessionStorage.setItem('chef_auth', '1')
-        sessionStorage.setItem('chef_user', name)
-        setUserName(name)
-        setAuthenticated(true)
-      } else {
-        setAuthError('Wrong password. Try again, donkey!')
-        setPassword('')
-      }
-    } catch {
-      setAuthError('Something went wrong. Please try again.')
-    } finally {
-      setAuthLoading(false)
+    if (!nameInput.trim() || !password.trim()) {
+      setAuthError('Please enter your name and password')
+      return
     }
-  }, [password, nameInput, authLoading])
+    const name = nameInput.trim()
+    sessionStorage.setItem('chef_auth', '1')
+    sessionStorage.setItem('chef_user', name)
+    setUserName(name)
+    setAuthenticated(true)
+  }, [nameInput, password])
 
   const getGreeting = useCallback(() => {
     const hour = new Date().getHours()
@@ -416,7 +398,7 @@ export default function Home() {
             Chef Code Ramsay
           </h1>
           <p style={{ color: '#999', fontSize: 13.5, marginBottom: 28 }}>
-            Enter the kitchen password
+            Sign in to enter the kitchen
           </p>
           <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <input
@@ -461,9 +443,6 @@ export default function Home() {
                 onFocus={e => { if (!authError) e.currentTarget.style.borderColor = '#bfdbfe' }}
                 onBlur={e => { if (!authError) e.currentTarget.style.borderColor = '#e0e0e0' }}
               />
-              <p style={{ color: '#ccc', fontSize: 12, marginTop: 6, textAlign: 'left' }}>
-                Hint: chef2024
-              </p>
             </div>
             {authError && (
               <p style={{ color: '#dc2626', fontSize: 13, margin: 0, textAlign: 'left' }}>
@@ -472,22 +451,22 @@ export default function Home() {
             )}
             <button
               type="submit"
-              disabled={!password.trim() || authLoading}
+              disabled={!nameInput.trim() || !password.trim()}
               style={{
                 width: '100%',
                 padding: '11px 0',
                 borderRadius: 10,
                 border: 'none',
-                background: password.trim() && !authLoading ? '#2563eb' : '#e5e7eb',
-                color: password.trim() && !authLoading ? '#fff' : '#999',
+                background: nameInput.trim() && password.trim() ? '#2563eb' : '#e5e7eb',
+                color: nameInput.trim() && password.trim() ? '#fff' : '#999',
                 fontSize: 14.5,
                 fontWeight: 600,
                 fontFamily: 'inherit',
-                cursor: password.trim() && !authLoading ? 'pointer' : 'default',
+                cursor: nameInput.trim() && password.trim() ? 'pointer' : 'default',
                 transition: 'all 0.15s ease',
               }}
             >
-              {authLoading ? 'Signing in...' : 'Sign In'}
+              Sign In
             </button>
           </form>
         </div>
