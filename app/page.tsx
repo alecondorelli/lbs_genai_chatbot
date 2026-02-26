@@ -89,6 +89,14 @@ function DocIcon() {
   )
 }
 
+function ChevronIcon() {
+  return (
+    <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
+  )
+}
+
 function PaperclipIcon() {
   return (
     <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -172,6 +180,8 @@ export default function Home() {
   const [modal, setModal] = useState<'prompt' | 'contribution' | null>(null)
   const [attachment, setAttachment] = useState<Attachment | null>(null)
   const [fileError, setFileError] = useState('')
+  const [modelPickerOpen, setModelPickerOpen] = useState(false)
+  const modelPickerRef = useRef<HTMLDivElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -183,6 +193,16 @@ export default function Home() {
   useEffect(() => {
     scrollToBottom()
   }, [messages, scrollToBottom])
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (modelPickerRef.current && !modelPickerRef.current.contains(e.target as Node)) {
+        setModelPickerOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   useEffect(() => {
     const textarea = textareaRef.current
@@ -342,48 +362,24 @@ export default function Home() {
             </p>
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <select
-            value={selectedModel}
-            onChange={(e) => setSelectedModel(e.target.value)}
-            disabled={isLoading}
+        {messages.length > 0 && (
+          <button
+            onClick={clearChat}
             style={{
-              background: '#f7f7f8',
-              border: '1px solid #e0e0e0',
-              borderRadius: 8,
-              padding: '6px 10px',
+              background: 'transparent',
+              border: 'none',
+              color: '#999',
+              padding: '4px 8px',
+              cursor: 'pointer',
               fontSize: 13,
               fontFamily: 'inherit',
-              color: '#333',
-              cursor: isLoading ? 'not-allowed' : 'pointer',
-              outline: 'none',
             }}
+            onMouseEnter={e => (e.currentTarget.style.color = '#555')}
+            onMouseLeave={e => (e.currentTarget.style.color = '#999')}
           >
-            {MODELS.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.label}
-              </option>
-            ))}
-          </select>
-          {messages.length > 0 && (
-            <button
-              onClick={clearChat}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: '#999',
-                padding: '4px 8px',
-                cursor: 'pointer',
-                fontSize: 13,
-                fontFamily: 'inherit',
-              }}
-              onMouseEnter={e => (e.currentTarget.style.color = '#555')}
-              onMouseLeave={e => (e.currentTarget.style.color = '#999')}
-            >
-              Clear chat
-            </button>
-          )}
-        </div>
+            Clear chat
+          </button>
+        )}
       </header>
 
       {/* Messages area */}
@@ -646,6 +642,80 @@ export default function Home() {
               lineHeight: 1.5,
             }}
           />
+          {/* Model picker */}
+          <div ref={modelPickerRef} style={{ position: 'relative', flexShrink: 0 }}>
+            <button
+              type="button"
+              onClick={() => setModelPickerOpen(prev => !prev)}
+              disabled={isLoading}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 3,
+                padding: '8px 4px',
+                cursor: isLoading ? 'default' : 'pointer',
+                color: '#999',
+                fontSize: 12.5,
+                fontFamily: 'inherit',
+                whiteSpace: 'nowrap',
+                transition: 'color 0.15s',
+              }}
+              onMouseEnter={e => { if (!isLoading) e.currentTarget.style.color = '#555' }}
+              onMouseLeave={e => (e.currentTarget.style.color = '#999')}
+            >
+              {MODELS.find(m => m.id === selectedModel)?.label ?? 'Model'}
+              <ChevronIcon />
+            </button>
+            {modelPickerOpen && (
+              <div style={{
+                position: 'absolute',
+                bottom: '100%',
+                right: 0,
+                marginBottom: 6,
+                background: '#fff',
+                border: '1px solid #e5e7eb',
+                borderRadius: 10,
+                boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+                overflow: 'hidden',
+                zIndex: 40,
+                minWidth: 160,
+              }}>
+                {MODELS.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedModel(m.id)
+                      setModelPickerOpen(false)
+                    }}
+                    style={{
+                      display: 'block',
+                      width: '100%',
+                      textAlign: 'left',
+                      background: m.id === selectedModel ? '#f0f5ff' : 'transparent',
+                      border: 'none',
+                      padding: '9px 14px',
+                      fontSize: 13,
+                      fontFamily: 'inherit',
+                      color: m.id === selectedModel ? '#2563eb' : '#333',
+                      fontWeight: m.id === selectedModel ? 600 : 400,
+                      cursor: 'pointer',
+                    }}
+                    onMouseEnter={e => {
+                      if (m.id !== selectedModel) e.currentTarget.style.background = '#f7f7f8'
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = m.id === selectedModel ? '#f0f5ff' : 'transparent'
+                    }}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <button
             type="submit"
             disabled={!canSend}
