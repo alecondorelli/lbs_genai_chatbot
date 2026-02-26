@@ -343,13 +343,24 @@ export default function Home() {
         body.mimeType = currentAttachment.mimeType
       }
 
+      console.log('[chat] Sending request:', {
+        model: selectedModel,
+        messageCount: updatedMessages.length,
+        hasImage: !!currentAttachment,
+        mimeType: currentAttachment?.mimeType,
+        base64Length: currentAttachment?.base64?.length,
+        bodySize: JSON.stringify(body).length,
+      })
+
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
 
-      if (!response.ok) throw new Error('Failed to send message')
+      console.log('[chat] Response status:', response.status, response.statusText)
+
+      if (!response.ok) throw new Error(`Failed: ${response.status} ${response.statusText}`)
 
       const reader = response.body?.getReader()
       if (!reader) throw new Error('No reader available')
@@ -389,7 +400,8 @@ export default function Home() {
           return updated
         })
       }
-    } catch {
+    } catch (error) {
+      console.error('[chat] Frontend error:', error)
       setMessages(prev => [
         ...prev.filter(m => !(m.role === 'assistant' && m.content === '')),
         { role: 'assistant', content: 'Sorry, something went wrong. Please try again.' },

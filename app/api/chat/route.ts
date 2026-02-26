@@ -93,8 +93,9 @@ function streamAnthropic(messages: ChatMessage[], file?: FileAttachment): Readab
         await stream.finalMessage()
         controller.enqueue(encoder.encode('data: [DONE]\n\n'))
         controller.close()
-      } catch (error) {
-        console.error('Anthropic stream error:', error)
+      } catch (error: unknown) {
+        const err = error as Error & { status?: number; message?: string }
+        console.error('Anthropic stream error:', { message: err.message, status: err.status, stack: err.stack })
         controller.error(error)
       }
     },
@@ -145,8 +146,9 @@ function streamOpenAI(messages: ChatMessage[], file?: FileAttachment): ReadableS
 
         controller.enqueue(encoder.encode('data: [DONE]\n\n'))
         controller.close()
-      } catch (error) {
-        console.error('OpenAI stream error:', error)
+      } catch (error: unknown) {
+        const err = error as Error & { status?: number; message?: string }
+        console.error('OpenAI stream error:', { message: err.message, status: err.status, stack: err.stack })
         controller.error(error)
       }
     },
@@ -191,8 +193,9 @@ function streamGemini(messages: ChatMessage[], file?: FileAttachment): ReadableS
 
         controller.enqueue(encoder.encode('data: [DONE]\n\n'))
         controller.close()
-      } catch (error) {
-        console.error('Gemini stream error:', error)
+      } catch (error: unknown) {
+        const err = error as Error & { status?: number; message?: string }
+        console.error('Gemini stream error:', { message: err.message, status: err.status, stack: err.stack })
         controller.error(error)
       }
     },
@@ -246,7 +249,9 @@ function filterOutputStream(source: ReadableStream): ReadableStream {
 
         controller.enqueue(encoder.encode('data: [DONE]\n\n'))
         controller.close()
-      } catch (error) {
+      } catch (error: unknown) {
+        const err = error as Error & { message?: string }
+        console.error('filterOutputStream error:', err.message, err)
         controller.error(error)
       }
     },
@@ -255,7 +260,17 @@ function filterOutputStream(source: ReadableStream): ReadableStream {
 
 export async function POST(req: Request) {
   try {
-    const { messages, model, image, mimeType } = await req.json()
+    const body = await req.json()
+    const { messages, model, image, mimeType } = body
+
+    // --- Debug logging ---
+    console.log('[chat] Request received:', {
+      model,
+      messageCount: messages?.length,
+      hasImage: !!image,
+      mimeType: mimeType || 'none',
+      imageBase64Length: image ? image.length : 0,
+    })
 
     if (!messages || !Array.isArray(messages)) {
       return new Response(JSON.stringify({ error: 'Messages array is required' }), {
@@ -290,6 +305,8 @@ export async function POST(req: Request) {
 
     const attachment: FileAttachment | undefined =
       image && mimeType ? { base64: image, mimeType } : undefined
+
+    console.log('[chat] Routing to:', selectedModel, '| attachment:', attachment ? `${attachment.mimeType} (${attachment.base64.length} chars)` : 'none')
 
     let readable: ReadableStream
 
