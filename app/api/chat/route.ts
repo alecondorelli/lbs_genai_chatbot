@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import OpenAI from 'openai'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { SYSTEM_PROMPT } from '@/lib/constants'
-import { checkContentFilter, INPUT_BLOCKED_MESSAGE, OUTPUT_BLOCKED_MESSAGE } from '@/lib/filters'
+import { checkContentFilter, INPUT_BLOCKED_MESSAGE } from '@/lib/filters'
 
 // Lazy SDK clients — avoid instantiating at module scope so Vercel builds
 // don't crash when env vars are absent during static page collection.
@@ -202,19 +202,23 @@ function streamGemini(messages: ChatMessage[], file?: FileAttachment): ReadableS
   })
 }
 
+// Allow up to 60 seconds for AI responses on Vercel (default is 10s)
+export const maxDuration = 60
+
 /**
- * Wraps a readable SSE stream to buffer the full response and check it
- * against the content filter once streaming completes. If flagged, the
- * buffered tokens are discarded and a single safety notice is sent instead.
+ * Wraps a readable SSE stream to pass chunks through immediately while
+ * accumulating the full response for a content-filter check. If the
+ * complete response is flagged, the server logs a warning; the frontend
+ * output filter handles replacing the message for the user.
+ *
+ * Previous implementation buffered ALL chunks before sending anything,
+ * which caused Vercel serverless functions to timeout.
  */
 function filterOutputStream(source: ReadableStream): ReadableStream {
-  const encoder = new TextEncoder()
-
   return new ReadableStream({
     async start(controller) {
       const reader = source.getReader()
       const decoder = new TextDecoder()
-      const bufferedChunks: Uint8Array[] = []
       let accumulated = ''
 
       try {
@@ -222,10 +226,10 @@ function filterOutputStream(source: ReadableStream): ReadableStream {
           const { done, value } = await reader.read()
           if (done) break
 
-          // Collect raw bytes so we can replay them if clean
-          bufferedChunks.push(value)
+          // Pass through to client immediately (no buffering)
+          controller.enqueue(value)
 
-          // Also parse out the text tokens to build the accumulated string
+          // Also accumulate text for post-stream content check
           const chunk = decoder.decode(value, { stream: true })
           for (const line of chunk.split('\n')) {
             if (line.startsWith('data: ')) {
@@ -236,18 +240,12 @@ function filterOutputStream(source: ReadableStream): ReadableStream {
           }
         }
 
-        // Check accumulated output
+        // Log if the output would have been filtered
+        // (the frontend output filter will handle replacing the message)
         if (checkContentFilter(accumulated)) {
-          // Send the safety warning instead of the real content
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(OUTPUT_BLOCKED_MESSAGE)}\n\n`))
-        } else {
-          // Replay all buffered chunks as-is
-          for (const chunk of bufferedChunks) {
-            controller.enqueue(chunk)
-          }
+          console.warn('[chat] Output filter: response contained flagged content')
         }
 
-        controller.enqueue(encoder.encode('data: [DONE]\n\n'))
         controller.close()
       } catch (error: unknown) {
         const err = error as Error & { message?: string }
